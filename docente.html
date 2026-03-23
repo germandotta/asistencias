@@ -559,12 +559,10 @@ async function confirmAttendance() {
   pendingStudent = null;
 
   try {
-    const res  = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, name, date: todayKey(), token: SECRET_TOKEN })
-    });
-    const data = await res.json();
+    const url = `${SCRIPT_URL}?action=mark&id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&date=${encodeURIComponent(todayKey())}&token=${encodeURIComponent(SECRET_TOKEN)}`;
+    const res  = await fetch(url, { redirect: 'follow' });
+    const text = await res.text();
+    const data = JSON.parse(text);
     if (data.ok) {
       showToast(name.split(' ')[0] + ' registrado/a', 'ok');
     } else {
@@ -572,6 +570,7 @@ async function confirmAttendance() {
     }
   } catch(e) {
     showToast('Error de conexión', 'err');
+    console.error(e);
   }
 
   setTimeout(startScanner, 500);
