@@ -197,25 +197,43 @@
 </div>
 
 <script>
-  const SCRIPT_URL = '{{SCRIPT_URL}}'; // reemplazar con tu URL de Apps Script
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-lMsVl9YHt5Hb4l2sfLs3_dt60RIcdgghAAuWaJse9t2ueKV0055YjQO2GMACY_u8mg/exec'; // reemplazar con tu URL de Apps Script
   let students = [];
 
   document.getElementById('hdate').textContent =
     new Date().toLocaleDateString('es-UY', { weekday:'short', day:'numeric', month:'short' });
 
-  (async function loadStudents() {
-    if (!SCRIPT_URL || SCRIPT_URL.includes('{{')) return;
-    try {
-      const res  = await fetch(SCRIPT_URL + '?action=getStudents');
-      const data = await res.json();
-      if (Array.isArray(data.students)) students = data.students;
-    } catch(_) {}
-  })();
+  let loading = false;
 
-  function onSearch() {
+  async function loadStudents() {
+    if (!SCRIPT_URL || SCRIPT_URL.includes('{{')) return;
+    loading = true;
+    try {
+      const res  = await fetch(SCRIPT_URL + '?action=getStudents', { redirect: 'follow' });
+      const text = await res.text();
+      const data = JSON.parse(text);
+      if (Array.isArray(data.students)) {
+        students = data.students;
+      }
+    } catch(e) {
+      console.error('loadStudents error:', e);
+    }
+    loading = false;
+  }
+
+  loadStudents();
+
+  async function onSearch() {
     const q   = document.getElementById('search-input').value.trim().toLowerCase();
     const box = document.getElementById('results');
     if (q.length < 2) { box.innerHTML = ''; return; }
+
+    // Si todavía está cargando o no cargó, reintentar
+    if (students.length === 0) {
+      box.innerHTML = '<div class="empty">Cargando lista...</div>';
+      await loadStudents();
+    }
+
     const hits = students.filter(s => s.name.toLowerCase().includes(q)).slice(0, 10);
     if (!hits.length) { box.innerHTML = '<div class="empty">Sin coincidencias</div>'; return; }
     box.innerHTML = hits.map(s =>
