@@ -566,6 +566,7 @@ async function confirmAttendance() {
     if (data.ok) {
       showToast(name.split(' ')[0] + ' registrado/a', 'ok');
     } else {
+      alert(JSON.stringify(data));
       showToast(data.message || 'Error', 'err');
     }
   } catch(e) {
