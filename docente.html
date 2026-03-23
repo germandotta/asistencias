@@ -526,30 +526,50 @@ async function onQRDetected(raw) {
   const student = students.find(s => s.id === id);
   const name    = student ? student.name : 'ID: ' + id;
 
-  // Verificar si ya marcó asistencia hoy
-  let alreadyPresent = false;
+  // Verificar cuántas pasadas tiene hoy
+  let passes = 0;
   try {
     const res  = await fetch(`${SCRIPT_URL}?action=check&id=${encodeURIComponent(id)}&date=${encodeURIComponent(todayKey())}`);
     const data = await res.json();
-    alreadyPresent = data.present === true;
+    passes = data.passes || 0;
   } catch(_) {}
 
-  pendingStudent = { id, name, alreadyPresent };
-  openModal(name, alreadyPresent);
+  if (passes >= 2) {
+    pendingStudent = null;
+    openModalFull(name, '✓ Ya tiene las dos pasadas registradas hoy', true);
+    return;
+  }
+
+  pendingStudent = { id, name, passes };
+  openModal(name, passes);
 }
 
 // ── MODAL ─────────────────────────────────────────────────
-function openModal(name, alreadyPresent) {
-  document.getElementById('modal-name').textContent = name;
-  document.getElementById('modal-date').textContent = todayLabel();
-  document.getElementById('modal-warn').style.display = alreadyPresent ? 'block' : 'none';
-  document.getElementById('modal').classList.add('open');
+function openModal(name, passes) {
+  const passLabel = passes === 0 ? '1ª pasada — ' : '2ª pasada — ';
+  const message   = passLabel + todayLabel();
+  document.getElementById('modal-warn').textContent = 'Ya tiene la 1ª pasada registrada';
+  openModalFull(name, message, false);
+  document.getElementById('modal-warn').style.display = passes === 1 ? 'block' : 'none';
 }
 
 function closeModal() {
   document.getElementById('modal').classList.remove('open');
   pendingStudent = null;
   setTimeout(startScanner, 400);
+}
+
+function openModalFull(name, message, closeOnly = false) {
+  document.getElementById('modal-name').textContent = name;
+  document.getElementById('modal-date').textContent = message;
+  document.getElementById('modal-warn').style.display = 'none';
+  const actions = document.getElementById('modal-actions');
+  if (closeOnly) {
+    actions.innerHTML = '<button class="btn-confirm" style="flex:1" onclick="closeModal()">Cerrar</button>';
+  } else {
+    actions.innerHTML = '<button class="btn-confirm" onclick="confirmAttendance()">Confirmar</button><button class="btn-cancel" onclick="closeModal()">Cancelar</button>';
+  }
+  document.getElementById('modal').classList.add('open');
 }
 
 async function confirmAttendance() {
@@ -559,19 +579,20 @@ async function confirmAttendance() {
   pendingStudent = null;
 
   try {
-    const url = `${SCRIPT_URL}?action=mark&id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&date=${encodeURIComponent(todayKey())}&token=${encodeURIComponent(SECRET_TOKEN)}`;
-    const res  = await fetch(url, { redirect: 'follow' });
-    const text = await res.text();
-    const data = JSON.parse(text);
+    const res  = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, name, date: todayKey(), token: SECRET_TOKEN })
+    });
+    const data = await res.json();
     if (data.ok) {
-      showToast(name.split(' ')[0] + ' registrado/a', 'ok');
+      const msg = name.split(' ')[0] + ' — pasada ' + (data.pass === 1 ? '1 registrada' : '2 registrada');
+      showToast(msg, 'ok');
     } else {
-      alert(JSON.stringify(data));
       showToast(data.message || 'Error', 'err');
     }
   } catch(e) {
     showToast('Error de conexión', 'err');
-    console.error(e);
   }
 
   setTimeout(startScanner, 500);
