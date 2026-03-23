@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Docente — Asistencia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
@@ -165,49 +166,14 @@
   .scanner-wrap {
     position: relative;
     width: 100%;
-    aspect-ratio: 1;
     border-radius: 10px;
     overflow: hidden;
     background: #000;
+    min-height: 300px;
   }
 
   #scanner-video {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .scan-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-  }
-
-  .scan-frame {
-    position: relative;
-    width: 58%;
-    aspect-ratio: 1;
-    border: 2px solid var(--accent);
-    border-radius: 10px;
-    box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
-  }
-
-  .scan-line {
-    position: absolute;
-    left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    top: 10%;
-    animation: scan 2s ease-in-out infinite;
-  }
-
-  @keyframes scan {
-    0%, 100% { top: 10%; }
-    50% { top: 85%; }
   }
 
   .scanner-status {
@@ -392,12 +358,7 @@
   <div class="card">
     <div class="card-label">Escáner QR</div>
     <div class="scanner-wrap">
-      <video id="scanner-video" playsinline autoplay muted></video>
-      <div class="scan-overlay">
-        <div class="scan-frame">
-          <div class="scan-line"></div>
-        </div>
-      </div>
+      <div id="scanner-video" style="width:100%;height:100%"></div>
     </div>
     <div class="scanner-status" id="scanner-status">Iniciando cámara...</div>
   </div>
@@ -484,7 +445,7 @@ function unlockApp() {
 }
 
 function lockApp() {
-  stopScanner();
+  stopScanner().catch(()=>{});
   pinValue = '';
   renderDots();
   document.getElementById('pin-error').textContent = '';
@@ -504,86 +465,48 @@ async function loadStudents() {
   } catch(_) {}
 }
 
-// ── SCANNER ───────────────────────────────────────────────
-let scannerOn  = false;
-let stream     = null;
-let rafId      = null;
-let lastScanned = {};
+// ── SCANNER (html5-qrcode — compatible iOS/Safari/Brave) ──
+let scannerOn      = false;
+let html5QrScanner = null;
+let lastScanned    = {};
 let pendingStudent = null;
-
-const canvas = document.createElement('canvas');
-const ctx    = canvas.getContext('2d', { willReadFrequently: true });
-
-const barcodeDetector = (typeof BarcodeDetector !== 'undefined')
-  ? new BarcodeDetector({ formats: ['qr_code'] })
-  : null;
-
-// Carga jsQR como fallback
-(function() {
-  const s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
-  document.head.appendChild(s);
-})();
 
 async function startScanner() {
   if (scannerOn) return;
-  const video  = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
+  status.textContent = 'Iniciando cámara...';
+  document.getElementById('scanner-video').innerHTML = '';
+
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
-    });
-    video.srcObject = stream;
-    await video.play();
+    html5QrScanner = new Html5Qrcode('scanner-video');
+    await html5QrScanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      async (decodedText) => { await onQRDetected(decodedText); },
+      () => {}
+    );
     scannerOn = true;
     document.getElementById('btn-toggle').textContent = 'Detener escáner';
     status.textContent = 'Apuntá al QR del estudiante';
-    rafId = requestAnimationFrame(scanLoop);
   } catch(e) {
     status.textContent = 'Sin acceso a la cámara';
+    console.error('Scanner error:', e);
   }
 }
 
-function stopScanner() {
-  if (!scannerOn) return;
-  cancelAnimationFrame(rafId);
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  stream = null; scannerOn = false;
+async function stopScanner() {
+  if (!scannerOn || !html5QrScanner) return;
+  try {
+    await html5QrScanner.stop();
+    html5QrScanner.clear();
+  } catch(_) {}
+  scannerOn = false;
   document.getElementById('btn-toggle').textContent = 'Iniciar escáner';
   document.getElementById('scanner-status').textContent = 'Escáner detenido';
 }
 
 function toggleScanner() {
   scannerOn ? stopScanner() : startScanner();
-}
-
-async function scanLoop() {
-  if (!scannerOn) return;
-  const video = document.getElementById('scanner-video');
-
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    let result = null;
-
-    if (barcodeDetector) {
-      try {
-        const codes = await barcodeDetector.detect(video);
-        if (codes.length) result = codes[0].rawValue;
-      } catch(_) {}
-    }
-
-    if (!result && window.jsQR) {
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-      if (code) result = code.data;
-    }
-
-    if (result) await onQRDetected(result);
-  }
-
-  rafId = requestAnimationFrame(scanLoop);
 }
 
 async function onQRDetected(raw) {
