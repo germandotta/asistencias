@@ -521,7 +521,7 @@ async function onQRDetected(raw) {
   if (lastScanned[id] && now - lastScanned[id] < COOLDOWN_MS) return;
   lastScanned[id] = now;
 
-  stopScanner();
+  await stopScanner();
 
   const student = students.find(s => s.id === id);
   const name    = student ? student.name : 'ID: ' + id;
@@ -579,12 +579,10 @@ async function confirmAttendance() {
   pendingStudent = null;
 
   try {
-    const res  = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, name, date: todayKey(), token: SECRET_TOKEN })
-    });
-    const data = await res.json();
+    const url  = `${SCRIPT_URL}?action=mark&id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&date=${encodeURIComponent(todayKey())}&token=${encodeURIComponent(SECRET_TOKEN)}`;
+    const res  = await fetch(url, { redirect: 'follow' });
+    const text = await res.text();
+    const data = JSON.parse(text);
     if (data.ok) {
       const msg = name.split(' ')[0] + ' — pasada ' + (data.pass === 1 ? '1 registrada' : '2 registrada');
       showToast(msg, 'ok');
@@ -593,6 +591,7 @@ async function confirmAttendance() {
     }
   } catch(e) {
     showToast('Error de conexión', 'err');
+    console.error(e);
   }
 
   setTimeout(startScanner, 500);
