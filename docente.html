@@ -523,16 +523,22 @@ async function onQRDetected(raw) {
 
   await stopScanner();
 
-  const student = students.find(s => s.id === id);
-  const name    = student ? student.name : 'ID: ' + id;
+  // Buscar nombre localmente; si no está, recargar lista desde el servidor
+  let student = students.find(s => s.id === id);
+  if (!student) {
+    await loadStudents();
+    student = students.find(s => s.id === id);
+  }
+  const name = student ? student.name : id;
 
   // Verificar cuántas pasadas tiene hoy
   let passes = 0;
   try {
-    const res  = await fetch(`${SCRIPT_URL}?action=check&id=${encodeURIComponent(id)}&date=${encodeURIComponent(todayKey())}`);
-    const data = await res.json();
+    const res  = await fetch(`${SCRIPT_URL}?action=check&id=${encodeURIComponent(id)}&date=${encodeURIComponent(todayKey())}`, { redirect: 'follow' });
+    const text = await res.text();
+    const data = JSON.parse(text);
     passes = data.passes || 0;
-  } catch(_) {}
+  } catch(e) { console.error('check error:', e); }
 
   if (passes >= 2) {
     pendingStudent = null;
@@ -590,8 +596,8 @@ async function confirmAttendance() {
       showToast(data.message || 'Error', 'err');
     }
   } catch(e) {
-    showToast('Error de conexión', 'err');
-    console.error(e);
+    showToast('Error: ' + e.message, 'err');
+    console.error('mark error:', e);
   }
 
   setTimeout(startScanner, 500);
