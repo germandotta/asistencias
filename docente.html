@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Docente — Asistencia</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #111;
+    --surface: #1c1c1c;
+    --surface2: #262626;
+    --border: #333;
+    --text: #f2f2f2;
+    --muted: #666;
+    --accent: #d4f53c;
+    --accent-dim: #1c2600;
+    --success: #3cffa0;
+    --danger: #ff5252;
+    --warn: #ffaa33;
+    --warn-bg: #2a1800;
+    --r: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 24px 20px;
+  }
+
+  /* ── PIN SCREEN ── */
+  #pin-screen {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .pin-logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .pin-title {
+    font-size: 22px;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .pin-dots {
+    display: flex;
+    gap: 14px;
+  }
+
+  .pin-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .pin-dot.filled { background: var(--accent); border-color: var(--accent); }
+  .pin-dot.error  { background: var(--danger); border-color: var(--danger); }
+
+  .pin-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 280px;
+  }
+
+  .pin-key {
+    aspect-ratio: 1;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 22px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  .pin-key:active { background: var(--surface2); transform: scale(0.94); }
+  .pin-key.wide   { grid-column: span 2; aspect-ratio: auto; padding: 18px; }
+  .pin-key.del    { font-size: 18px; }
+
+  .pin-error {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--danger);
+    min-height: 18px;
+    text-align: center;
+  }
+
+  /* ── SCANNER SCREEN ── */
+  #scanner-screen {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2px;
+  }
+
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  #header-date {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 18px;
+  }
+
+  .card-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 14px;
+  }
+
+  .scanner-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #000;
+  }
+
+  #scanner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .scan-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .scan-frame {
+    position: relative;
+    width: 58%;
+    aspect-ratio: 1;
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+  }
+
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    top: 10%;
+    animation: scan 2s ease-in-out infinite;
+  }
+
+  @keyframes scan {
+    0%, 100% { top: 10%; }
+    50% { top: 85%; }
+  }
+
+  .scanner-status {
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+    padding-top: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 22px;
+  }
+
+  .btn {
+    padding: 13px 18px;
+    border: none;
+    border-radius: 9px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+  }
+
+  .btn:active { transform: scale(0.97); }
+  .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-lock    { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 13px; }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.82);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s;
+  }
+
+  .modal-backdrop.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    padding: 28px 22px 44px;
+    width: 100%;
+    max-width: 420px;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .modal-backdrop.open .modal { transform: translateY(0); }
+
+  .modal-pill {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: -12px auto 4px;
+  }
+
+  .modal-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .modal-name {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .modal-date {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    background: var(--accent-dim);
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid #3a5500;
+  }
+
+  .modal-warn {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn);
+    color: var(--warn);
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    display: none;
+  }
+
+  .modal-actions { display: flex; gap: 10px; }
+
+  .btn-confirm {
+    flex: 2; padding: 15px; font-size: 16px;
+    background: var(--accent); color: #111;
+    border: none; border-radius: 10px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600; cursor: pointer;
+  }
+
+  .btn-cancel {
+    flex: 1; padding: 15px; font-size: 15px;
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 500; cursor: pointer;
+  }
+
+  .btn-confirm:active, .btn-cancel:active { transform: scale(0.97); }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-90px);
+    padding: 11px 22px;
+    border-radius: 100px;
+    font-weight: 600;
+    font-size: 14px;
+    z-index: 200;
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    white-space: nowrap;
+    pointer-events: none;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.ok   { background: var(--success); color: #111; }
+  .toast.err  { background: var(--danger);  color: #fff; }
+  .toast.warn { background: var(--warn);    color: #111; }
+</style>
+</head>
+<body>
+
+<!-- PIN SCREEN -->
+<div id="pin-screen">
+  <span class="pin-logo">Asistencia — Docente</span>
+  <div class="pin-title">Ingresá el PIN</div>
+  <div class="pin-dots" id="pin-dots">
+    <div class="pin-dot" id="d0"></div>
+    <div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div>
+    <div class="pin-dot" id="d3"></div>
+  </div>
+  <div class="pin-pad">
+    <div class="pin-key" onclick="pinKey('1')">1</div>
+    <div class="pin-key" onclick="pinKey('2')">2</div>
+    <div class="pin-key" onclick="pinKey('3')">3</div>
+    <div class="pin-key" onclick="pinKey('4')">4</div>
+    <div class="pin-key" onclick="pinKey('5')">5</div>
+    <div class="pin-key" onclick="pinKey('6')">6</div>
+    <div class="pin-key" onclick="pinKey('7')">7</div>
+    <div class="pin-key" onclick="pinKey('8')">8</div>
+    <div class="pin-key" onclick="pinKey('9')">9</div>
+    <div class="pin-key wide" onclick="pinKey('0')">0</div>
+    <div class="pin-key del" onclick="pinDel()">⌫</div>
+  </div>
+  <div class="pin-error" id="pin-error"></div>
+</div>
+
+<!-- SCANNER SCREEN -->
+<div id="scanner-screen">
+  <div class="top-bar">
+    <span class="logo">Docente</span>
+    <span id="header-date"></span>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Escáner QR</div>
+    <div class="scanner-wrap">
+      <video id="scanner-video" playsinline autoplay muted></video>
+      <div class="scan-overlay">
+        <div class="scan-frame">
+          <div class="scan-line"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scanner-status" id="scanner-status">Iniciando cámara...</div>
+  </div>
+
+  <button class="btn btn-ghost" id="btn-toggle" onclick="toggleScanner()">Detener escáner</button>
+  <button class="btn btn-lock"  onclick="lockApp()">Cerrar sesión</button>
+</div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <div class="modal-pill"></div>
+    <div class="modal-tag">Registrar asistencia</div>
+    <div class="modal-name" id="modal-name">-</div>
+    <div class="modal-date" id="modal-date">-</div>
+    <div class="modal-warn" id="modal-warn">Ya figura presente hoy</div>
+    <div class="modal-actions">
+      <button class="btn-confirm" onclick="confirmAttendance()">Confirmar</button>
+      <button class="btn-cancel"  onclick="closeModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIGURACIÓN ─────────────────────────────────────────
+const SCRIPT_URL   = 'https://script.google.com/macros/s/AKfycbx-lMsVl9YHt5Hb4l2sfLs3_dt60RIcdgghAAuWaJse9t2ueKV0055YjQO2GMACY_u8mg/exec';   // reemplazá con tu URL de Apps Script
+const CORRECT_PIN  = '1718';          // reemplazá con tu PIN (ej: '4821')
+const SECRET_TOKEN = 'xK9mP2vL7nQ4';        // reemplazá con el mismo token que en Apps Script
+const PIN_LENGTH   = 4;
+const COOLDOWN_MS  = 5000;
+
+// ── PIN ───────────────────────────────────────────────────
+let pinValue = '';
+
+function pinKey(digit) {
+  if (pinValue.length >= PIN_LENGTH) return;
+  pinValue += digit;
+  renderDots();
+  if (pinValue.length === PIN_LENGTH) validatePin();
+}
+
+function pinDel() {
+  pinValue = pinValue.slice(0, -1);
+  renderDots();
+  document.getElementById('pin-error').textContent = '';
+  document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('error'));
+}
+
+function renderDots() {
+  for (let i = 0; i < PIN_LENGTH; i++) {
+    const dot = document.getElementById('d' + i);
+    dot.classList.toggle('filled', i < pinValue.length);
+    dot.classList.remove('error');
+  }
+}
+
+function validatePin() {
+  if (pinValue === CORRECT_PIN) {
+    unlockApp();
+  } else {
+    document.querySelectorAll('.pin-dot').forEach(d => {
+      d.classList.remove('filled');
+      d.classList.add('error');
+    });
+    document.getElementById('pin-error').textContent = 'PIN incorrecto';
+    setTimeout(() => {
+      pinValue = '';
+      renderDots();
+      document.getElementById('pin-error').textContent = '';
+    }, 900);
+  }
+}
+
+function unlockApp() {
+  document.getElementById('pin-screen').style.display    = 'none';
+  document.getElementById('scanner-screen').style.display = 'flex';
+  document.getElementById('header-date').textContent =
+    new Date().toLocaleDateString('es-UY', { weekday:'short', day:'numeric', month:'short' });
+  startScanner();
+  loadStudents();
+}
+
+function lockApp() {
+  stopScanner();
+  pinValue = '';
+  renderDots();
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('scanner-screen').style.display = 'none';
+  document.getElementById('pin-screen').style.display     = 'flex';
+}
+
+// ── STUDENTS ──────────────────────────────────────────────
+let students = [];
+
+async function loadStudents() {
+  if (!SCRIPT_URL || SCRIPT_URL.includes('{{')) return;
+  try {
+    const res  = await fetch(SCRIPT_URL + '?action=getStudents');
+    const data = await res.json();
+    if (Array.isArray(data.students)) students = data.students;
+  } catch(_) {}
+}
+
+// ── SCANNER ───────────────────────────────────────────────
+let scannerOn  = false;
+let stream     = null;
+let rafId      = null;
+let lastScanned = {};
+let pendingStudent = null;
+
+const canvas = document.createElement('canvas');
+const ctx    = canvas.getContext('2d', { willReadFrequently: true });
+
+const barcodeDetector = (typeof BarcodeDetector !== 'undefined')
+  ? new BarcodeDetector({ formats: ['qr_code'] })
+  : null;
+
+// Carga jsQR como fallback
+(function() {
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+  document.head.appendChild(s);
+})();
+
+async function startScanner() {
+  if (scannerOn) return;
+  const video  = document.getElementById('scanner-video');
+  const status = document.getElementById('scanner-status');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
+    });
+    video.srcObject = stream;
+    await video.play();
+    scannerOn = true;
+    document.getElementById('btn-toggle').textContent = 'Detener escáner';
+    status.textContent = 'Apuntá al QR del estudiante';
+    rafId = requestAnimationFrame(scanLoop);
+  } catch(e) {
+    status.textContent = 'Sin acceso a la cámara';
+  }
+}
+
+function stopScanner() {
+  if (!scannerOn) return;
+  cancelAnimationFrame(rafId);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; scannerOn = false;
+  document.getElementById('btn-toggle').textContent = 'Iniciar escáner';
+  document.getElementById('scanner-status').textContent = 'Escáner detenido';
+}
+
+function toggleScanner() {
+  scannerOn ? stopScanner() : startScanner();
+}
+
+async function scanLoop() {
+  if (!scannerOn) return;
+  const video = document.getElementById('scanner-video');
+
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    let result = null;
+
+    if (barcodeDetector) {
+      try {
+        const codes = await barcodeDetector.detect(video);
+        if (codes.length) result = codes[0].rawValue;
+      } catch(_) {}
+    }
+
+    if (!result && window.jsQR) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+      if (code) result = code.data;
+    }
+
+    if (result) await onQRDetected(result);
+  }
+
+  rafId = requestAnimationFrame(scanLoop);
+}
+
+async function onQRDetected(raw) {
+  let id = null;
+  try {
+    const u = new URL(raw);
+    id = u.searchParams.get('id');
+  } catch(_) { return; }
+  if (!id) return;
+
+  const now = Date.now();
+  if (lastScanned[id] && now - lastScanned[id] < COOLDOWN_MS) return;
+  lastScanned[id] = now;
+
+  stopScanner();
+
+  const student = students.find(s => s.id === id);
+  const name    = student ? student.name : 'ID: ' + id;
+
+  // Verificar si ya marcó asistencia hoy
+  let alreadyPresent = false;
+  try {
+    const res  = await fetch(`${SCRIPT_URL}?action=check&id=${encodeURIComponent(id)}&date=${encodeURIComponent(todayKey())}`);
+    const data = await res.json();
+    alreadyPresent = data.present === true;
+  } catch(_) {}
+
+  pendingStudent = { id, name, alreadyPresent };
+  openModal(name, alreadyPresent);
+}
+
+// ── MODAL ─────────────────────────────────────────────────
+function openModal(name, alreadyPresent) {
+  document.getElementById('modal-name').textContent = name;
+  document.getElementById('modal-date').textContent = todayLabel();
+  document.getElementById('modal-warn').style.display = alreadyPresent ? 'block' : 'none';
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  pendingStudent = null;
+  setTimeout(startScanner, 400);
+}
+
+async function confirmAttendance() {
+  if (!pendingStudent) return;
+  const { id, name } = pendingStudent;
+  document.getElementById('modal').classList.remove('open');
+  pendingStudent = null;
+
+  try {
+    const res  = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, name, date: todayKey(), token: SECRET_TOKEN })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(name.split(' ')[0] + ' registrado/a', 'ok');
+    } else {
+      showToast(data.message || 'Error', 'err');
+    }
+  } catch(e) {
+    showToast('Error de conexión', 'err');
+  }
+
+  setTimeout(startScanner, 500);
+}
+
+// ── HELPERS ───────────────────────────────────────────────
+function todayKey() {
+  const d  = new Date();
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+function todayLabel() {
+  return new Date().toLocaleDateString('es-UY', {
+    weekday:'long', day:'numeric', month:'long', year:'numeric'
+  });
+}
+
+let toastTimer = null;
+function showToast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
