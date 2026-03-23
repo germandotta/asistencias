@@ -254,7 +254,7 @@
     const box = document.getElementById('qr-output');
     box.innerHTML = '';
     new QRCode(box, {
-      text: SCRIPT_URL + '?action=scan&id=' + id,
+      text: id,
       width: 230, height: 230,
       colorDark: '#000', colorLight: '#fff',
       correctLevel: QRCode.CorrectLevel.M

@@ -510,11 +510,8 @@ function toggleScanner() {
 }
 
 async function onQRDetected(raw) {
-  let id = null;
-  try {
-    const u = new URL(raw);
-    id = u.searchParams.get('id');
-  } catch(_) { return; }
+  // El QR codifica solo el ID del estudiante
+  const id = raw.trim();
   if (!id) return;
 
   const now = Date.now();
